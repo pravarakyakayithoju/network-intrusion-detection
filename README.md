@@ -8,30 +8,30 @@ Detecting malicious network flows, and classifying them into 9 attack types, on 
 
 | Model | ROC-AUC | PR-AUC | Recall at validation-chosen ≤1% FPR threshold | Test FPR at that threshold |
 |---|---|---|---|---|
-| **Hist Gradient Boosting** | **0.984** | **0.988** | **90.6%** | 4.2% |
+| **Hist Gradient Boosting** | **0.984** | **0.988** | **91.3%** | 4.8% |
 | Random Forest | 0.983 | 0.987 | 89.2% | 3.7% |
-| Logistic Regression | 0.967 | 0.976 | 79.1% | 2.1% |
+| Logistic Regression | 0.967 | 0.976 | 79.2% | 2.1% |
 
 **Attack-type classification (10 classes)**
 
 | Model | Accuracy | Macro-F1 |
 |---|---|---|
 | Random Forest | 76.1% | 0.451 |
-| Random Forest + balanced class weights | 71.2% | **0.478** |
+| Random Forest + balanced class weights | 71.0% | **0.480** |
 
 ## What the checks found
 
-1. **False alarms don't transfer from validation to test.** A threshold set for ≤1% FPR on validation data gives 4.2% FPR on the test set. All 1,551 false alarms at that threshold are normal flows from TTL-254/62 hosts, the network segments that carry the attacks in this lab. That kind of normal traffic rises from 24% of normal flows in training to 52% in testing. In other words, the model has partly learned *where traffic comes from*, not *what it does*.
-2. **Dropping the TTL columns doesn't remove the shortcut.** ROC-AUC barely moves (0.984 → 0.981) and test FPR stays the same, so other features carry the same network-segment information.
+1. **False alarms don't transfer from validation to test.** A threshold set for ≤1% FPR on validation data gives 4.8% FPR on the test set. The false alarms come from normal flows from TTL-254/62 hosts, the network segments that carry the attacks in this lab; normal flows with TTL 31 or 0 trigger none. That kind of normal traffic rises from 24% of normal flows in training to 52% in testing. In other words, the model has partly learned *where traffic comes from*, not *what it does*.
+2. **Dropping the TTL columns doesn't remove the shortcut.** ROC-AUC barely moves (0.984 → 0.981) and the alert-threshold FPR only drops from 4.8% to 4.3%, still more than 4× the target, so other features carry the same network-segment information.
 3. **Train/test duplicates inflate results only slightly.** 10.4% of test flows also appear in training. On the unseen 89.6%, ROC-AUC is still 0.981.
-4. **Some attack types can't be separated with these features.** 79% of DoS, 77% of Backdoor and 72% of Analysis training rows have a feature-identical twin with a different label. Class weighting lifts rare-class recall (Worms 2% → 39%, Backdoor 5% → 26%) but costs Normal recall (75% → 67%).
+4. **Some attack types can't be separated with these features.** 79% of DoS, 77% of Backdoor and 72% of Analysis training rows have a feature-identical twin with a different label. Class weighting lifts rare-class recall (Worms 2% → 39%, Backdoor 5% → 27%) but costs Normal recall (75% → 67%).
 
 ## Methodology
 
 - **Leakage control:** `id` and `attack_cat` are excluded from features. Encoders and scalers are fitted on training data only. Categories seen only in the test set (two connection states) are handled with `handle_unknown`.
 - **Threshold selection:** made on a 15% stratified validation split of the official training set. The official test set is used once per model.
 - **Interpretability:** permutation importance (PR-AUC drop) on a balanced test sample.
-- **Limitations:** the data is lab-generated traffic from 2015, the official train and test files differ in their normal-traffic mix, and results come from a single seed.
+- **Limitations:** the data is lab-generated traffic from 2015, the official train and test files differ in their normal-traffic mix, and results come from a single seed (exact numbers shift slightly across scikit-learn versions).
 
 ## Run it
 
